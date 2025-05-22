@@ -7,7 +7,11 @@ import time
 class Program:
     id: str
     code: str
-    fitness_scores: Dict[str, float] = field(default_factory=dict)                                                 
+    fitness_scores: Dict[str, float] = field(default_factory=dict)
+
+    # Optional version field for backward compatibility with tests
+    version: int = 0
+    task_id: Optional[str] = None
     generation: int = 0
     parent_id: Optional[str] = None
     island_id: Optional[int] = None

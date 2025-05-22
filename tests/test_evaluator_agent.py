@@ -199,6 +199,9 @@ class TestEvaluatorAgentDockerExecution(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(evaluated_program.fitness_scores["passed_tests"], 1.0)
         self.assertEqual(evaluated_program.fitness_scores["total_tests"], 1.0)
         self.assertEqual(evaluated_program.fitness_scores["runtime_ms"], 10.0)
+        self.assertIn("clearness", evaluated_program.fitness_scores)
+        self.assertGreaterEqual(evaluated_program.fitness_scores["clearness"], 0.0)
+        self.assertLessEqual(evaluated_program.fitness_scores["clearness"], 1.0)
         self.assertEqual(len(evaluated_program.errors), 0)
 
     @patch('evaluator_agent.agent.EvaluatorAgent._execute_code_safely', new_callable=AsyncMock)
@@ -212,6 +215,7 @@ class TestEvaluatorAgentDockerExecution(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(evaluated_program.fitness_scores["correctness"], 0.0)
         # passed_tests and total_tests might not be set or be 0 if execution fails before assessment
         self.assertIn("Execution Error: Script crashed badly", evaluated_program.errors)
+        self.assertIn("clearness", evaluated_program.fitness_scores)
 
     @patch('evaluator_agent.agent.EvaluatorAgent._execute_code_safely', new_callable=AsyncMock)
     async def test_evaluate_program_failed_evaluation_due_to_incorrect_output(self, mock_execute_code_safely):
@@ -229,6 +233,7 @@ class TestEvaluatorAgentDockerExecution(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(evaluated_program.fitness_scores["passed_tests"], 0.0)
         self.assertEqual(evaluated_program.fitness_scores["total_tests"], 1.0)
         self.assertIn("Failed 1 out of 1 test cases.", evaluated_program.errors)
+        self.assertIn("clearness", evaluated_program.fitness_scores)
 
 
 if __name__ == '__main__':

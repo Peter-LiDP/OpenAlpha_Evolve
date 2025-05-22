@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 from typing import Optional, Dict, Any, Tuple, List
+from collections import Counter
 
 from config import settings
 from core.interfaces import EvaluatorAgentInterface, Program, TaskDefinition, BaseAgent
@@ -23,6 +24,28 @@ class EvaluatorAgent(EvaluatorAgentInterface, BaseAgent):
         logger.info(f"EvaluatorAgent initialized with model: {self.evaluation_model_name}, timeout: {self.evaluation_timeout_seconds}s")
         if self.task_definition:
             logger.info(f"EvaluatorAgent task_definition: {self.task_definition.id}")
+
+    def _compute_clearness(self, execution_results: Optional[Dict[str, Any]]) -> float:
+        """Estimate clearness of the outputs via token entropy."""
+        if not execution_results or "test_outputs" not in execution_results:
+            return 0.0
+        tokens: List[str] = []
+        for out in execution_results.get("test_outputs", []):
+            if out.get("status") == "success":
+                tokens.extend(str(out.get("output")).split())
+            else:
+                tokens.extend(str(out.get("error", "")).split())
+
+        if not tokens:
+            return 0.0
+        counts = Counter(tokens)
+        total = len(tokens)
+        if len(counts) == 1:
+            return 1.0
+        entropy = -sum((c / total) * math.log(c / total, 2) for c in counts.values())
+        max_entropy = math.log(len(counts), 2) if len(counts) > 1 else 1.0
+        clarity = 1.0 - entropy / max_entropy
+        return max(0.0, min(1.0, clarity))
 
     def _check_syntax(self, code: str) -> List[str]:
         errors = []
@@ -241,7 +264,7 @@ print(json.dumps(final_output, default=custom_json_serializer))
 
         except asyncio.TimeoutError:
             logger.warning(f"Execution for container '{container_name}' initiating timeout handling.")
-            if proc and proc.returncode is None: # Check if process is still running
+            if proc:
                 logger.info(f"Attempting to stop Docker container: {container_name}")
                 stop_cmd = ["docker", "stop", container_name]
                 try:
@@ -265,8 +288,8 @@ print(json.dumps(final_output, default=custom_json_serializer))
             
             if proc: # Original docker run process
                 try:
-                    if proc.returncode is None: proc.kill()
-                    await proc.wait() 
+                    proc.kill()
+                    await proc.wait()
                 except ProcessLookupError: pass
                 except Exception as e_kill: logger.error(f"Error trying to kill original subprocess after docker stop/kill: {e_kill}")
             
@@ -342,6 +365,7 @@ print(json.dumps(final_output, default=custom_json_serializer))
         if syntax_errors:
             program.errors.extend(syntax_errors)
             program.fitness_scores["correctness"] = 0.0
+            program.fitness_scores["clearness"] = 0.0
             program.status = "failed_evaluation"
             logger.warning(f"Syntax errors found in program {program.id}: {syntax_errors}")
             return program
@@ -354,8 +378,11 @@ print(json.dumps(final_output, default=custom_json_serializer))
             
             if execution_error:
                 logger.warning(f"Execution error for program {program.id}: {execution_error}")
-                if f"Execution Error: {execution_error}" not in program.errors:
-                    program.errors.append(f"Execution Error: {execution_error}")
+                error_msg = execution_error
+                if not error_msg.startswith("Execution Error"):
+                    error_msg = f"Execution Error: {error_msg}"
+                if error_msg not in program.errors:
+                    program.errors.append(error_msg)
             
             if execution_results is None and not execution_error: # Should ideally not happen if error reporting is robust
                  if "Execution Error: No results returned and no specific error message." not in program.errors:
@@ -376,6 +403,9 @@ print(json.dumps(final_output, default=custom_json_serializer))
             
             average_runtime = execution_results.get("average_runtime_ms") if execution_results else float('inf')
             program.fitness_scores["runtime_ms"] = average_runtime
+
+            clearness = self._compute_clearness(execution_results)
+            program.fitness_scores["clearness"] = clearness
             
             logger.info(f"Program {program.id} correctness: {correctness:.2f} ({passed_tests}/{total_tests} tests passed), Avg Runtime: {average_runtime}ms")
 
@@ -404,6 +434,7 @@ print(json.dumps(final_output, default=custom_json_serializer))
             logger.info(f"No input/output examples provided for task {task.id}. Skipping execution-based correctness check for program {program.id}.")
             program.fitness_scores["correctness"] = 0.5 # Default score if no tests
             program.fitness_scores["runtime_ms"] = 0.0
+            program.fitness_scores["clearness"] = 0.5
             program.status = "evaluated" # No tests to fail
 
         # This part is largely unreachable due to returns within the if/else block, but as a safeguard:
