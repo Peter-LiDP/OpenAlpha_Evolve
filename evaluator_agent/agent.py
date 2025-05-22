@@ -241,7 +241,7 @@ print(json.dumps(final_output, default=custom_json_serializer))
 
         except asyncio.TimeoutError:
             logger.warning(f"Execution for container '{container_name}' initiating timeout handling.")
-            if proc and proc.returncode is None: # Check if process is still running
+            if proc:
                 logger.info(f"Attempting to stop Docker container: {container_name}")
                 stop_cmd = ["docker", "stop", container_name]
                 try:
@@ -265,8 +265,8 @@ print(json.dumps(final_output, default=custom_json_serializer))
             
             if proc: # Original docker run process
                 try:
-                    if proc.returncode is None: proc.kill()
-                    await proc.wait() 
+                    proc.kill()
+                    await proc.wait()
                 except ProcessLookupError: pass
                 except Exception as e_kill: logger.error(f"Error trying to kill original subprocess after docker stop/kill: {e_kill}")
             
@@ -354,8 +354,11 @@ print(json.dumps(final_output, default=custom_json_serializer))
             
             if execution_error:
                 logger.warning(f"Execution error for program {program.id}: {execution_error}")
-                if f"Execution Error: {execution_error}" not in program.errors:
-                    program.errors.append(f"Execution Error: {execution_error}")
+                error_msg = execution_error
+                if not error_msg.startswith("Execution Error"):
+                    error_msg = f"Execution Error: {error_msg}"
+                if error_msg not in program.errors:
+                    program.errors.append(error_msg)
             
             if execution_results is None and not execution_error: # Should ideally not happen if error reporting is robust
                  if "Execution Error: No results returned and no specific error message." not in program.errors:
