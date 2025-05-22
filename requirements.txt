@@ -1,38 +1,22 @@
-# Core Libraries
-litellm
-python-dotenv>=1.0.0
-
-# LLM Models & Frameworks
-transformers
-torch
-accelerate
-bitsandbytes
-sentencepiece
-
-# Evolutionary Algorithms / RL
-deap
-pygad
-ray[rllib]
-stable-baselines3
-
-# Evaluation & Sandboxing
-pytest
-hypothesis
-e2b-sdk  # For E2B sandbox
-docker
-
-# Data Storage
-psycopg2-binary
-pymongo
-dvc
-
-# Utilities
-jinja2
-
-# API/Web (Optional, if exposing functionality)
-fastapi
-uvicorn
-
-asyncio>=3.4.3
-uuid>=1.30
-gradio>=4.0.0
+python-dotenv~=1.1
+litellm==1.70.0
+torch==2.7.0
+transformers==4.52.2
+accelerate==1.7.0
+bitsandbytes==0.45.5
+sentencepiece==0.2.0
+deap==1.4.3
+pygad==3.4.0
+ray[rllib]==2.46.0
+stable-baselines3[extra]==2.6.0
+pytest~=8.3
+hypothesis~=6.131
+e2b-code-interpreter==1.5.0
+docker~=7.1
+psycopg2-binary==2.9.10
+pymongo==4.13.0
+dvc[ssh,web]==3.59.2
+jinja2~=3.1
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+gradio==5.30.0
